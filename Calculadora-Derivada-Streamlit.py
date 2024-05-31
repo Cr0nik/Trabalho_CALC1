@@ -5,71 +5,78 @@ import numpy as np
 # Título da aplicação
 st.title('Calculadora de Derivadas Polinomiais com Gráfico')
 
-# Campo de entrada para a quantidade
-quantidade = st.number_input('Digite a quantidade de polinômios:', min_value=1, step=1)
-
-polinomios = []
-
-# Listas para armazenar os campos de entrada
-multp = []
-expoente = []
-derivada = []
-
-def calcular_derivada(multiplicadores, potencias):
-    derivadas = []
-    for multiplicador, potencia in zip(multiplicadores, potencias):
+def format_polynomial(terms):
+    term_str = []
+    for multp, potencia in terms:
+        if multp == 0:
+            continue
         if potencia == 0:
-            derivadas.append(0)
+            term_str.append(f"{multp}")
+        elif potencia == 1:
+            term_str.append(f"{multp if multp != 1 else ''}x")
         else:
-            derivadas.append(multiplicador * potencia)
-    return derivadas
+            term_str.append(f"{multp if multp != 1 else ''}x^{potencia}")
+    return ' + '.join(term_str).replace(' + -', ' - ')
 
-# Geração dos campos com base na quantidade fornecida
-for i in range(quantidade):
-    st.write(f'Campos para o polinômio {i + 1}')
-    multp.append(st.number_input(f'Digite o multiplicador do polinômio {i + 1} aqui:', step=1.0, key=f'mult{i}'))
-    expoente.append(st.number_input(f'Digite a potência do polinômio {i + 1} aqui:', step=1.0, key=f'exp{i}'))
-    polinomios.append((multp, expoente))
+def calculate_derivative(terms):
+    derivative_terms = []
+    for multp, potencia in terms:
+        if potencia != 0:
+            derivative_terms.append((multp * potencia, potencia - 1))
+    return derivative_terms
 
-# Ponto onde a reta tangente será calculada
-ponto_tangente = st.number_input('Digite o ponto onde a reta tangente será calculada:', step=1.0)
+def evaluate_polynomial(terms, x):
+    return sum(multp * x**potencia for multp, potencia in terms)
 
-# Calcular a derivada dos polinômios
-if st.button('Calcular Derivadas'):
-    derivada = calcular_derivada(multp, expoente)
-    for i in range(quantidade):
-        st.write(f'A derivada do polinômio {i + 1} é: {derivada[i]}')
+# Solicitar a quantidade de termos do polinômio
+num_terms = st.number_input('Digite a quantidade de termos do polinômio:', min_value=1, value=1, step=1)
 
-    for multiplicador, potencia in polinomios:
-        # Função polinomial e sua derivada
-        def polinomio(x):
-            return sum(m * x**e for m, e in zip(multp, expoente))
+terms = []
+for i in range(num_terms):
+    multp = st.number_input(f'Digite o multiplicador do termo {i+1}:', key=f'multp_{i}', min_value=1, step=1, value=1)
+    potencia = st.number_input(f'Digite a potência do termo {i+1}:', min_value=0, key=f'potencia_{i}', step=1)
+    terms.append((multp, potencia))
 
-        def derivada_polinomio(x):
-            return sum(d * x**(e-1) for d, e in zip(derivada, expoente) if e != 0)
-
-        # Ponto específico para a reta tangente
-        x0 = ponto_tangente
-        y0 = polinomio(x0)
-        dy_dx = derivada_polinomio(x0)
+if st.button('Calcular Derivada'):
+    try:
+        # Exibir função f(x)
+        f_x = format_polynomial(terms)
+        st.write(f"f(x) = {f_x}")
         
-        # Função da reta tangente
-        def reta_tangente(x):
-            return dy_dx * (x - x0) + y0
+        # Calcular e exibir a derivada f'(x)
+        derivative_terms = calculate_derivative(terms)
+        f_prime_x = format_polynomial(derivative_terms)
+        st.write(f"f'(x) = {f_prime_x}")
 
-        # Plotar o gráfico do polinômio e da reta tangente
-        x_vals = np.linspace(x0 - 10, x0 + 10, 400)
-        y_vals = polinomio(x_vals)
-        y_tan_vals = reta_tangente(x_vals)
+        # Guardar os termos e a derivada calculada na sessão
+        st.session_state['terms'] = terms
+        st.session_state['derivative_terms'] = derivative_terms
+        st.session_state['f_x'] = f_x
+        st.session_state['f_prime_x'] = f_prime_x
+    except Exception as e:
+        st.write(f'Erro ao calcular a derivada: {e}')
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(x_vals, y_vals, label='Polinômio')
-    plt.plot(x_vals, y_tan_vals, '--', label='Reta Tangente')
-    plt.scatter([x0], [y0], color='red')  # Marca o ponto de tangência
-    plt.text(x0, y0, f'({x0}, {y0})', fontsize=12, verticalalignment='bottom')
-    plt.xlabel('x')
-    plt.ylabel('f(x)')
-    plt.title('Gráfico do Polinômio e da Reta Tangente')
-    plt.legend()
-    plt.grid(True)
-    st.pyplot(plt)
+if 'terms' in st.session_state and st.checkbox("Deseja calcular valor funcional?"):
+    try:
+        a = st.number_input("Qual o valor de a?", value=0, step=1)
+        f_a = evaluate_polynomial(st.session_state['terms'], a)
+        f_prime_a = evaluate_polynomial(st.session_state['derivative_terms'], a)
+        st.write(f"f({a}) = {f_a}")
+        st.write(f"f'({a}) = {f_prime_a}")
+        st.write(f"P({a}, {f_a})")
+
+        if st.checkbox("Deseja calcular equação da reta tangente ao gráfico de f no ponto P(a, f(a))?"):
+            x = np.linspace(a - 10, a + 10, 1000)
+            tangent_line = f_prime_a * (x - a) + f_a
+            fig, ax = plt.subplots()
+            y = np.array([evaluate_polynomial(st.session_state['terms'], xi) for xi in x])
+            ax.plot(x, y, label=f'f(x) = {st.session_state["f_x"]}')
+            ax.plot(x, tangent_line, label=f'Tangente em P({a}, {f_a})')
+            ax.scatter([a], [f_a], color='red')  # Ponto P(a, f(a))
+            ax.legend()
+            ax.grid(True)
+            st.pyplot(fig)
+
+            st.write(f"A equação da reta tangente ao gráfico de f no ponto P({a}, {f_a}) é y = {f_prime_a} * (x - {a}) + {f_a}")
+    except Exception as e:
+        st.write(f'Erro ao calcular o valor funcional ou a equação da reta tangente: {e}')
