@@ -33,7 +33,7 @@ num_terms = st.number_input('Digite a quantidade de termos do polinômio:', min_
 
 terms = []
 for i in range(num_terms):
-    multp = st.number_input(f'Digite o multiplicador do termo {i+1}:', key=f'multp_{i}', min_value=1, step=1, value=1)
+    multp = st.number_input(f'Digite o multiplicador do termo {i+1}:', key=f'multp_{i}', step=1, value=1)
     potencia = st.number_input(f'Digite a potência do termo {i+1}:', min_value=0, key=f'potencia_{i}', step=1)
     terms.append((multp, potencia))
 
