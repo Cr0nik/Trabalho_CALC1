@@ -29,7 +29,7 @@ def calculate_derivative(terms):
 def evaluate_polynomial(terms, x):
     return sum(multp * x**potencia for multp, potencia in terms)
 
-def newton_raphson(terms, x0, tolerance=1e-7, max_iterations=100):
+def newton_raphson(terms, x0, tolerance=1e-8, max_iterations=100):
     for _ in range(max_iterations):
         fx = evaluate_polynomial(terms, x0)
         f_prime_terms = calculate_derivative(terms)
@@ -42,6 +42,17 @@ def newton_raphson(terms, x0, tolerance=1e-7, max_iterations=100):
         x0 = x1
     return None  # Não convergiu
 
+def find_roots_in_interval(terms, interval, tolerance=1e-8, max_iterations=100):
+    roots = []
+    step_size = 0.1  # Passo de iteração dentro do intervalo
+    for x0 in np.arange(interval[0], interval[1] + step_size, step_size):
+        root = newton_raphson(terms, x0, tolerance, max_iterations)
+        if root is not None and interval[0] <= root <= interval[1]:
+            # Verifica se a raiz já não está na lista de raízes encontradas (evita duplicação)
+            if not any(abs(root - r) < tolerance for r in roots):
+                roots.append(root)
+    return roots
+
 # Interface do Streamlit
 tab1, tab2 = st.tabs(["Calculadora de Derivadas", "Método de Newton-Raphson"])
 
@@ -51,7 +62,7 @@ with tab1:
 
     terms = []
     for i in range(num_terms):
-        multp = st.number_input(f'Digite o multiplicador do termo {i+1}:', key=f'multp_{i}', min_value=1, step=1, value=1)
+        multp = st.number_input(f'Digite o multiplicador do termo {i+1}:', key=f'multp_{i}', step=1.0, value=1.0)
         potencia = st.number_input(f'Digite a potência do termo {i+1}:', min_value=0, key=f'potencia_{i}', step=1)
         terms.append((multp, potencia))
 
@@ -105,20 +116,31 @@ with tab2:
 
     terms = []
     for i in range(num_terms):
-        multp = st.number_input(f'Digite o multiplicador do termo {i+1}:', key=f'nr_multp_{i}', min_value=1, step=1, value=1)
-        potencia = st.number_input(f'Digite a potência do termo {i+1}:', min_value=0, key=f'nr_potencia_{i}', step=1)
+        multp = st.number_input(f'Digite o multiplicador do termo {i+1}:', key=f'nr_multp_{i}', step=1.0, value=1.0)
+        potencia = st.number_input(f'Digite a potência do termo {i+1}:', min_value=0, key=f'nr_potencia_{i}', step=1, value=1)
         terms.append((multp, potencia))
 
-    x0 = st.number_input("Digite o valor inicial x0:", value=0.0)
-    tolerance = st.number_input("Digite a tolerância:", value=1e-7, format="%e")
-    max_iterations = st.number_input("Digite o número máximo de iterações:", min_value=1, value=100, step=1)
+    tolerance_exponent = st.number_input("Digite o expoente da tolerância (10^exp):", value=-8, step=1)
+    tolerance = 10**tolerance_exponent
+    max_iterations = st.number_input("Digite o número máximo de iterações:", min_value=1, value=100, step=10)
 
-    if st.button('Calcular Raiz'):
+    if st.button('Calcular Raízes'):
         try:
-            root = newton_raphson(terms, x0, tolerance, max_iterations)
-            if root is not None:
-                st.write(f"A raiz encontrada é: {root}")
+            roots = find_roots_in_interval(terms, interval=[-10, 10], tolerance=tolerance, max_iterations=max_iterations)
+            if roots:
+                st.write("Raízes encontradas no intervalo [-10, 10]:")
+                for root in roots:
+                    st.write(f"Raiz: {root}")
+                x = np.linspace(-10, 10, 1000)
+                y = np.array([evaluate_polynomial(terms, xi) for xi in x])
+                fig, ax = plt.subplots()
+                ax.plot(x, y, label=f'f(x) = {format_polynomial(terms)}')
+                ax.scatter(roots, [0] * len(roots), color='red')
+                ax.legend()
+                ax.grid(True)
+                st.pyplot(fig)
+                
             else:
-                st.write("O método não convergiu.")
+                st.write("Nenhuma raiz encontrada no intervalo [-10, 10].")
         except Exception as e:
-            st.write(f'Erro ao calcular a raiz: {e}')
+            st.write(f'Erro ao calcular as raízes: {e}')
